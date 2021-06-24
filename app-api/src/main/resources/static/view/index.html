@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+      .message {
+        width: 600px;
+        min-height: 400px;
+        padding: 15px;
+        border: 1px solid #ccc;    
+      }
+      .message .a {
+        text-align: right;
+      }
+      .message li {
+        line-height: 30px;
+        list-style: none;
+      }
+  </style>
+</head>
+
+<body>
+  <div class="login">
+    <input type="text" class="login-input">
+    <button class="btn-login">登录</button>
+  </div>
+  <h4 class="name">当前用户：</h4>
+  <h4 class="toName">发送给用户：</h4>
+  <div class="usersList"></div>
+  <div class="wrap">
+    <input type="text" class="input">
+    <button class="btn-send">发送</button>
+  </div>
+  <ul class="message"></ul>
+
+  <script>
+    window.onload = () => {
+      let msgData = {
+        fromUserId: '',
+        toUserId: '',
+        type: '',
+        content: '',
+      };
+
+      let elInput = document.querySelector('.input');
+      let elLoginInput = document.querySelector('.login-input');
+      let elUl = document.querySelector('.message');
+      let elh4 = document.querySelector('.name');
+      let elh42 = document.querySelector('.toName');
+      let select = document.querySelector('.users');
+      let usersList = document.querySelector('.usersList');
+      let ws = null;
+
+      function connectWebsocket() {
+        console.log("test:"+msgData.fromUserId)
+        ws = new WebSocket('ws://120.79.6.209:8080/chat/'+msgData.fromUserId);
+
+        // 连接成功
+        ws.onopen = () => {
+          console.log('连接服务端WebSocket成功');
+          msgData.type='open';
+          ws.send(JSON.stringify(msgData));
+        };
+
+        // 监听服务端消息
+        ws.onmessage = (msg) => {
+          let message = JSON.parse(msg.data);
+          if (message.type === 'open') {
+            console.log('用户 ' + message.fromUserId + ' 加入监控系统');
+            getList(JSON.parse(message.content));
+          } else if (message.type === 'close') {
+            console.log('用户 ' + message.fromUserId + ' 退出监控系统');
+            getList(JSON.parse(message.content));
+          } else {
+            console.log('收到的消息：', message)
+            elUl.innerHTML += `<li class="b">${message.fromUserId}：${message.content}</li>`;
+          }
+        };
+
+        // 连接失败
+        ws.onerror = () => {
+          console.log('连接失败，正在重连...');
+          connectWebsocket();
+        };
+
+        // 连接关闭
+        ws.onclose = () => {
+          console.log('连接关闭');
+        };
+      };
+
+      function getList( list ){
+        usersList.innerHTML = '<div class="usersList"></div>'
+        for (i=0;i < list.length; i++) {
+          usersList.innerHTML += `<input type="radio" value="${list[i]}" name="user">${list[i]}</input>`
+        }
+      }
+
+
+      document.querySelector('.btn-login').addEventListener('click', () => {
+        msgData.fromUserId = elLoginInput.value
+        connectWebsocket();  
+        elh4.innerHTML = `<h4 class="name">当前用户：${elLoginInput.value}</h4>`;
+      });
+
+      document.querySelector('.btn-send').addEventListener('click', () => {
+        var obj = document.getElementsByName("user")
+        for (var i = 0; i < obj.length; i++) { //遍历Radio 
+          if (obj[i].checked) {
+            msgData.toUserId = obj[i].value;                   
+          }
+        }
+        let msg = { ...msgData, content: elInput.value, type: 'text' };
+        ws.send(JSON.stringify(msg));    
+        elUl.innerHTML += `<li class="a">${elInput.value}：${msgData.fromUserId}`;
+        elInput.value = '';
+      });
+        
+    }
+
+  </script>
+</body>
+
+</html>
