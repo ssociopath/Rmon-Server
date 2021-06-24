@@ -2,7 +2,10 @@ package com.bobooi.watch.common.component;
 
 import com.bobooi.watch.common.utils.JsonUtil;
 import com.bobooi.watch.common.utils.misc.Constant;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +37,17 @@ public class WebSocketChatServer {
         return users;
     }
 
+    public void userChange(String userId, String type){
+        Message message = new Message(userId,"",type,JsonUtil.toJsonString(getOnlineSessions()));
+        onlineSessions.forEach(((id, session1) -> {
+            try {
+                session1.getBasicRemote().sendText(JsonUtil.toJsonString(message));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }));
+    }
+
 
     /**
      * 当客户端打开连接：1.添加会话对象 2.更新在线人数
@@ -41,6 +55,7 @@ public class WebSocketChatServer {
     @OnOpen
     public void onOpen(Session session,@PathParam("userId") String userId) {
         onlineSessions.put(userId, session);
+        userChange(userId, Constant.OPEN);
         System.out.println("成功连接，在线人数："+onlineSessions.size());
     }
 
@@ -50,12 +65,15 @@ public class WebSocketChatServer {
      * PS: 这里约定传递的消息为JSON字符串 方便传递更多参数！
      */
     @OnMessage
-    public void onMessage(Session session, String jsonStr) throws IOException {
+    public void onMessage(String jsonStr) throws IOException {
+        System.out.println(jsonStr);
         Message message = JsonUtil.parseObject(jsonStr, Message.class);
         if(Constant.OPEN.equals(message.type)){
 
         }else{
-            onlineSessions.get(message.toUserId).getBasicRemote().sendText(JsonUtil.toJsonString(message));
+            if(onlineSessions.containsKey(message.toUserId)){
+                onlineSessions.get(message.toUserId).getBasicRemote().sendText(JsonUtil.toJsonString(message));
+            }
         }
         log.info("收到消息："+message);
     }
@@ -64,8 +82,9 @@ public class WebSocketChatServer {
      * 当关闭连接：1.移除会话对象 2.更新在线人数
      */
     @OnClose
-    public void onClose(Session session,@PathParam("userId") String userId) {
+    public void onClose(@PathParam("userId") String userId) {
         onlineSessions.remove(userId);
+        userChange(userId, Constant.CLOSE);
         System.out.println("关闭连接，在线人数："+onlineSessions.size());
     }
 
@@ -78,6 +97,8 @@ public class WebSocketChatServer {
     }
 
     @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
     public static class Message{
         private String fromUserId;
         private String toUserId;

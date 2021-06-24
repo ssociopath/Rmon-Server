@@ -16,4 +16,5 @@ public class Constant {
      * ws消息类型中的关闭连接
      */
     public static final String TEXT = "text";
+    public static final String CLOSE = "close";
 }
