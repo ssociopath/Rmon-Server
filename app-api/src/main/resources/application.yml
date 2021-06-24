@@ -1,1 +1,12 @@
+server:
+  servlet:
+    context-path: '/chat'
+  tomcat:
+    max-swallow-size: 100MB
+
+#spring:
+#  resources:
+#    static-locations: file:/home/bobo/AdvancedEAST/whole_img_results/
+#  mvc:
+#    static-path-pattern: /outputImage/**
 

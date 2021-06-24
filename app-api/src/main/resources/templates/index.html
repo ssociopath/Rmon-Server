@@ -7,6 +7,13 @@
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Document</title>
   <style>
+      .toName {
+        margin-top: -21px;
+        margin-bottom: 0;
+      }
+      .usersList {
+        margin-bottom: 10px;
+      }
       .message {
         width: 600px;
         min-height: 400px;
@@ -46,17 +53,14 @@
         content: '',
       };
 
-      let elInput = document.querySelector('.input');
-      let elLoginInput = document.querySelector('.login-input');
+      let msgInput = document.querySelector('.input');
+      let userInput = document.querySelector('.login-input');
+      let elUser = document.querySelector('.name');
       let elUl = document.querySelector('.message');
-      let elh4 = document.querySelector('.name');
-      let elh42 = document.querySelector('.toName');
-      let select = document.querySelector('.users');
       let usersList = document.querySelector('.usersList');
       let ws = null;
 
       function connectWebsocket() {
-        console.log("test:"+msgData.fromUserId)
         ws = new WebSocket('ws://120.79.6.209:8080/chat/'+msgData.fromUserId);
 
         // 连接成功
@@ -91,33 +95,39 @@
         ws.onclose = () => {
           console.log('连接关闭');
         };
-      };
+      }
 
       function getList( list ){
         usersList.innerHTML = '<div class="usersList"></div>'
-        for (i=0;i < list.length; i++) {
-          usersList.innerHTML += `<input type="radio" value="${list[i]}" name="user">${list[i]}</input>`
+        if(list.length===1){
+          usersList.innerHTML += '<a> 聊天室当前没有用户在线 </a>'
+        }else{
+          for (i=0;i < list.length; i++) {
+            if(list[i]!==msgData.fromUserId){
+              usersList.innerHTML += `<input type="radio" value="${list[i]}" name="user">${list[i]}</input>`
+            }
+          }
         }
       }
 
 
       document.querySelector('.btn-login').addEventListener('click', () => {
-        msgData.fromUserId = elLoginInput.value
+        msgData.fromUserId = userInput.value
         connectWebsocket();  
-        elh4.innerHTML = `<h4 class="name">当前用户：${elLoginInput.value}</h4>`;
+        elUser.innerHTML = `<h4 class="name">当前用户：${userInput.value}</h4>`;
       });
 
       document.querySelector('.btn-send').addEventListener('click', () => {
-        var obj = document.getElementsByName("user")
-        for (var i = 0; i < obj.length; i++) { //遍历Radio 
+        let obj = document.getElementsByName("user")
+        for (let i = 0; i < obj.length; i++) { //遍历Radio
           if (obj[i].checked) {
             msgData.toUserId = obj[i].value;                   
           }
         }
-        let msg = { ...msgData, content: elInput.value, type: 'text' };
+        let msg = { ...msgData, content: msgInput.value, type: 'text' };
         ws.send(JSON.stringify(msg));    
-        elUl.innerHTML += `<li class="a">${elInput.value}：${msgData.fromUserId}`;
-        elInput.value = '';
+        elUl.innerHTML += `<li class="a">${msgInput.value}：${msgData.fromUserId}`;
+        msgInput.value = '';
       });
         
     }

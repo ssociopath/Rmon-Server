@@ -1,13 +1,8 @@
 package com.bobooi.watch.api.controller;
-
-import com.bobooi.watch.common.component.WebSocketChatServer;
-import com.bobooi.watch.common.response.ApplicationResponse;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 
 /**
  * @author bobo
@@ -15,11 +10,10 @@ import java.util.List;
  */
 
 @CrossOrigin(allowCredentials = "true")
-@RestController
-@RequestMapping("/msg")
+@Controller
 public class MessageController {
-    @GetMapping
-    public ApplicationResponse<List<String>> test(){
-        return ApplicationResponse.succeed(WebSocketChatServer.getOnlineSessions());
+    @RequestMapping("/index")
+    public String index(){
+        return "index";
     }
 }

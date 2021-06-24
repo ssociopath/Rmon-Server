@@ -1,4 +1,4 @@
-package com.bobooi.watch.common.component;
+package com.bobooi.watch.api.controller;
 
 import com.bobooi.watch.common.utils.JsonUtil;
 import com.bobooi.watch.common.utils.misc.Constant;
@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
-@ServerEndpoint("/chat/{userId}")//标记此类为服务端
+@ServerEndpoint("/{userId}")//标记此类为服务端
 public class WebSocketChatServer {
 
     private static Map<String, Session> onlineSessions = new ConcurrentHashMap<>();
