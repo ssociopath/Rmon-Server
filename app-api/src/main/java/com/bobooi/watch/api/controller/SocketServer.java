@@ -1,36 +1,28 @@
 package com.bobooi.watch.api.controller;
 
+import com.bobooi.watch.api.protocol.MsgPack;
+import com.bobooi.watch.api.protocol.MsgPackDecoder;
+import com.bobooi.watch.api.protocol.MsgPackEncoder;
+import com.bobooi.watch.common.utils.misc.Constant;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
-import java.io.BufferedReader;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,31 +30,53 @@ import java.util.concurrent.TimeUnit;
  * @date 2021/6/25
  */
 
-public class SocketServer {
+@Component
+public class SocketServer implements CommandLineRunner {
+    private static Map<String, Channel> onlineSessions = new ConcurrentHashMap<>();
 
-    public void connect() throws IOException, InterruptedException {
-        NioEventLoopGroup bossGroup = new NioEventLoopGroup();
-        NioEventLoopGroup workerGroup = new NioEventLoopGroup();
-
-        ServerBootstrap serverBootstrap = new ServerBootstrap();
-        serverBootstrap
-                .group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childHandler(new ChannelInitializer<NioSocketChannel>() {
-                    @Override
-                    protected void initChannel(NioSocketChannel ch) {
-                        ch.pipeline().addLast(new IdleStateHandler(10, 0, 0, TimeUnit.SECONDS));
-                        ch.pipeline().addLast(new FirstServerHandler());
-                    }
-                });
-
-        serverBootstrap.bind(5555).sync();
+    public void sendMsg(byte type,int id,byte flag,byte[] content){
+        onlineSessions.forEach(((s, socketChannel) -> {
+            if(socketChannel.isOpen() || socketChannel.isActive()){
+                socketChannel.writeAndFlush(new MsgPack(type,id,flag,content));
+            }
+        }));
     }
 
-    static class FirstServerHandler extends ChannelInboundHandlerAdapter {
+    @Override
+    public void run(String... args) throws Exception {
+        NioEventLoopGroup bossGroup = new NioEventLoopGroup();
+        NioEventLoopGroup workerGroup = new NioEventLoopGroup();
+        ServerBootstrap serverBootstrap = new ServerBootstrap();
+        try {
+            serverBootstrap
+                    .group(bossGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer<NioSocketChannel>() {
+                        @Override
+                        protected void initChannel(NioSocketChannel ch) {
+                            ch.pipeline().addLast(new IdleStateHandler(10, 0, 0, TimeUnit.SECONDS))
+                                    .addLast(new LengthFieldBasedFrameDecoder(65535, 0,4,0,4))
+                                    .addLast(new MsgPackDecoder())
+                                    .addLast(new LengthFieldPrepender(4))
+                                    .addLast(new MsgPackEncoder())
+                                    .addLast(new ServerHandler());
+                        }
+                    });
+            ChannelFuture f = serverBootstrap.bind(5555).sync();
+            f.channel().closeFuture().sync();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }finally {
+            bossGroup.shutdownGracefully();
+            workerGroup.shutdownGracefully();
+        }
+    }
+
+    static class ServerHandler extends ChannelInboundHandlerAdapter {
         private int unRecPingTimes = 0;
+        private String clientAddr="";
         private static final int MAX_UN_REC_PING_TIMES = 3;
-        private Random random = new Random(System.currentTimeMillis());
+        private static Map<Integer,byte[]> pkgList = new HashMap<>();
 
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
@@ -70,13 +84,10 @@ public class SocketServer {
                 IdleStateEvent event = (IdleStateEvent) evt;
                 if (event.state()== IdleState.READER_IDLE){
                     System.out.println("===服务端===(READER_IDLE 读超时)");
-                    // 失败计数器次数大于等于3次的时候，关闭链接，等待client重连
                     if (unRecPingTimes >= MAX_UN_REC_PING_TIMES) {
                         System.out.println("===服务端===(读超时，关闭chanel)");
-                        // 连续超过N次未收到client的ping消息，那么关闭该通道，等待client重连
                         ctx.close();
                     } else {
-                        // 失败计数器加1
                         unRecPingTimes++;
                     }
                 }else {
@@ -86,43 +97,82 @@ public class SocketServer {
         }
 
         @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) {
-            ByteBuf byteBuf = (ByteBuf) msg;
-            String msgStr = byteBuf.toString(StandardCharsets.UTF_8);
-            System.out.println(new Date() + msgStr);
-            if("heart".equals(msgStr)){
-                System.out.println("服务端收到心跳连接");
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws IOException {
+            MsgPack msgPack = (MsgPack)msg;
+            byte[] part = msgPack.getContent();
+            int id = msgPack.getId();
+            if(pkgList.containsKey(msgPack.getId())){
+                byte[] prePart = pkgList.get(id);
+                ByteBuffer byteBuffer = ByteBuffer.allocate(prePart.length+part.length);
+                byteBuffer.put(prePart);
+                byteBuffer.put(part);
+                byte[] nowPart = byteBuffer.array();
+                if(Constant.DF==msgPack.getFlag()){
+                    handleData(ctx,id,msgPack.getType(),nowPart);
+                    pkgList.remove(id);
+                }else{
+                    pkgList.put(id,nowPart);
+                }
             }else{
-                System.out.println("服务端读到数据 -> " + msgStr);
-                //接收到客户端的消息后我们再回复客户端
-                ByteBuf out = getByteBuf(ctx);
-                ctx.channel().writeAndFlush(out);
+                if(Constant.MF==msgPack.getFlag()){
+                    pkgList.put(id, msgPack.getContent());
+                }else{
+                    handleData(ctx,id,msgPack.getType(),msgPack.getContent());
+                }
             }
+        }
+
+        public void handleData(ChannelHandlerContext ctx, int id, byte type, byte[] content) throws IOException {
+            String response = "收到客户端 "+clientAddr + " ";
+            MsgPack responsePack;
+            switch (type){
+                case Constant.HEART:
+                    response  += "心跳连接:seq="+ id;
+                    break;
+                case Constant.LOGIN:
+                    // TODO 处理登录逻辑
+                    response += "登录信息:seq="+ id;
+                    break;
+                case Constant.LOGOUT:
+                    // TODO 处理登出逻辑
+                    response  += "登出信息:seq="+ id;
+                    break;
+                case Constant.TEXT:
+                    // TODO 处理文本逻辑
+                    response += "文本消息:seq="+ id;
+                    break;
+                case Constant.IMAGE:
+                    // TODO 处理图片逻辑
+                    response += "图片消息:seq="+ id;
+                    FileOutputStream out = new FileOutputStream("test.jpg");
+                    out.write(content);
+                    out.close();
+                    WebSocketChatServer.sendMsg(clientAddr,"IMAGE",Base64.getEncoder().encodeToString(content));
+                    break;
+                default:
+                    System.out.println("错误类型！");
+                    break;
+            }
+            System.out.println(response);
+            responsePack = new MsgPack(Constant.TEXT,id+1,Constant.DF,response.getBytes());
+            ctx.writeAndFlush(responsePack);
         }
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
             super.channelActive(ctx);
-            System.out.println("客户端"+ctx.channel().remoteAddress()+"已连接");
+            clientAddr = String.valueOf(ctx.channel().remoteAddress());
+            onlineSessions.put(clientAddr,ctx.channel());
+            System.out.println("客户端 "+clientAddr+" 已连接");
+
         }
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             super.channelInactive(ctx);
-            System.out.println("客户端"+ctx.channel().remoteAddress()+"已断开");
+            onlineSessions.remove(clientAddr);
+            System.out.println("客户端 "+clientAddr+" 已断开");
         }
-
-        private ByteBuf getByteBuf(ChannelHandlerContext ctx) {
-            byte[] bytes = "服务器:我是服务器，我收到你的消息了！".getBytes(StandardCharsets.UTF_8);
-            ByteBuf buffer = ctx.alloc().buffer();
-            buffer.writeBytes(bytes);
-            return buffer;
-        }
-    }
-
-    public static void main(String[] args) throws IOException, InterruptedException {
-        SocketServer socketServer = new SocketServer();
-        socketServer.connect();
     }
 
 }

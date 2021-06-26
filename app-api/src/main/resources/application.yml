@@ -1,6 +1,14 @@
 server:
   servlet:
-    context-path: '/chat'
+    context-path: '/watch'
   tomcat:
     max-swallow-size: 100MB
+
+spring:
+  profiles:
+    active: common,data
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 15MB
 
