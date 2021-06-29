@@ -1,26 +1,22 @@
 package com.bobooi.watch.api.controller;
 
-import com.bobooi.watch.common.component.BeanHelper;
+import com.bobooi.watch.api.protocol.vo.WsMessage;
 import com.bobooi.watch.common.utils.JsonUtil;
 import com.bobooi.watch.common.utils.misc.Constant;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import com.bobooi.watch.data.entity.Pc;
+import com.bobooi.watch.data.service.concrete.PcService;
+import com.bobooi.watch.data.service.concrete.RuleService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.tomcat.util.bcel.Const;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.antlr.v4.runtime.dfa.DFA;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.RequestMapping;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import javax.websocket.*;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,25 +27,24 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
-@ServerEndpoint("/{userId}")//标记此类为服务端
+@ServerEndpoint("/{userId}")
 public class WebSocketChatServer {
-    private static Map<String, Session> onlineSessions = new ConcurrentHashMap<>();
+    private static Map<String, Session> ONLINE_SESSIONS = new ConcurrentHashMap<>();
+    private static Map<String, WsMessage> CONNECT_SESSIONS = new ConcurrentHashMap<>();
+    @Resource
+    SocketServer socketServer;
+    @Resource
+    private RuleService ruleService;
+    @Resource
+    private PcService pcService;
+    private static WebSocketChatServer webSocketChatServer;
 
-    public static List<String> getOnlineSessions(){
-        List<String> users = new ArrayList<>(onlineSessions.size());
-        onlineSessions.forEach((userId, session) -> users.add(userId));
-        return users;
-    }
-
-    public void userChange(String userId, String type){
-        Message message = new Message(userId,"",type,JsonUtil.toJsonString(getOnlineSessions()));
-        onlineSessions.forEach(((id, session1) -> {
-            try {
-                session1.getBasicRemote().sendText(JsonUtil.toJsonString(message));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }));
+    @PostConstruct
+    public void init() {
+        webSocketChatServer = this;
+        webSocketChatServer.pcService = this.pcService;
+        webSocketChatServer.ruleService = this.ruleService;
+        webSocketChatServer.socketServer = this.socketServer;
     }
 
 
@@ -58,37 +53,34 @@ public class WebSocketChatServer {
      */
     @OnOpen
     public void onOpen(Session session,@PathParam("userId") String userId) {
-        onlineSessions.put(userId, session);
-        userChange(userId, Constant.OPEN);
-        System.out.println("成功连接，在线人数："+onlineSessions.size());
+        ONLINE_SESSIONS.put(userId, session);
+        System.out.println("成功连接，在线人数："+ ONLINE_SESSIONS.size());
     }
 
 
     @OnMessage
     public void onMessage(String jsonStr) throws IOException {
         System.out.println(jsonStr);
-        Message message = JsonUtil.parseObject(jsonStr, Message.class);
-        if(Constant.OPEN.equals(message.type)){
+        WsMessage wsMessage = JsonUtil.parseObject(jsonStr, WsMessage.class);
+        if(Constant.WS_OPEN.equals(wsMessage.getType())){
 
         }else{
-            SocketServer socketServer = BeanHelper.getBean(SocketServer.class);
-            socketServer.sendMsg(Constant.IMAGE,-1, Constant.DF,"来点图片".getBytes(StandardCharsets.UTF_8));
-            if(onlineSessions.containsKey(message.toUserId)){
-                onlineSessions.get(message.toUserId).getBasicRemote().sendText(JsonUtil.toJsonString(message));
+            Pc pc = webSocketChatServer.pcService.findOneByMac(wsMessage.getToUserId());
+            if(pc!=null && webSocketChatServer.ruleService.findOneByUserIdAndPcId(Integer.valueOf(wsMessage.getFromUserId()),pc.getId())!=null){
+                wsMessage.setToUserId(String.valueOf(pc.getId()));
+                String content = JsonUtil.toJsonString(wsMessage);
+                CONNECT_SESSIONS.put(wsMessage.getFromUserId(),wsMessage);
+                webSocketChatServer.socketServer.sendMsg(pc.getId(),Constant.IMAGE,Constant.RESPONSE_SUCCEED,
+                        -1, Constant.DF,content.getBytes(StandardCharsets.UTF_8));
             }
         }
-        log.info("收到消息："+message);
+        log.info("收到消息："+ wsMessage);
     }
 
-    public static void sendMsg(String mac, String type, String content){
-        Message message = new Message(mac,"",type,content);
-        onlineSessions.forEach(((id, session1) -> {
-            try {
-                session1.getBasicRemote().sendText(JsonUtil.toJsonString(message));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }));
+    public static void sendMsg(WsMessage wsMessage) throws IOException {
+        if(ONLINE_SESSIONS.containsKey(wsMessage.getFromUserId())){
+            ONLINE_SESSIONS.get(wsMessage.getFromUserId()).getBasicRemote().sendText(JsonUtil.toJsonString(wsMessage));
+        }
     }
 
     /**
@@ -96,9 +88,12 @@ public class WebSocketChatServer {
      */
     @OnClose
     public void onClose(@PathParam("userId") String userId) {
-        onlineSessions.remove(userId);
-        userChange(userId, "close");
-        System.out.println("关闭连接，在线人数："+onlineSessions.size());
+        WsMessage wsMessage = CONNECT_SESSIONS.get(userId);
+        ONLINE_SESSIONS.remove(userId);
+        CONNECT_SESSIONS.remove(userId);
+        webSocketChatServer.socketServer.sendMsg(Integer.valueOf(wsMessage.getToUserId()),Constant.LOGOUT,
+                Constant.RESPONSE_SUCCEED, -2, Constant.DF,"关闭监控".getBytes());
+        System.out.println("关闭连接，在线人数："+ ONLINE_SESSIONS.size());
     }
 
     /**
@@ -107,16 +102,6 @@ public class WebSocketChatServer {
     @OnError
     public void onError(Session session, Throwable error) {
         error.printStackTrace();
-    }
-
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class Message{
-        private String fromUserId;
-        private String toUserId;
-        private String type;
-        private String content;
     }
 
 }

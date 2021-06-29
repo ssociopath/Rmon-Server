@@ -7,21 +7,24 @@ package com.bobooi.watch.common.utils.misc;
  */
 
 public class Constant {
-    /**
-     * ws消息类型中的开启连接
-     */
-    public static final String OPEN = "open";
-
     public static final int ACCOUNT_MAX_LEN =20;
     public static final int PASSWORD_MAX_LEN = 8;
-    public static final int MAC_LEN = 17;
 
+    public static final String WS_OPEN = "open";
+
+    /**
+     * 消息类型，即请求内容类型
+     */
     public static final byte HEART = 1;
     public static final byte LOGIN = 2;
     public static final byte LOGOUT = 3;
-    public static final byte TEXT = 4;
-    public static final byte IMAGE = 5;
+    public static final byte IMAGE = 4;
+    public static final byte DATA_UPDATE = 5;
+    public static final byte DATA_DELETE = 6;
 
     public static final byte DF = -1;
     public static final byte MF = -2;
+
+    public static final byte RESPONSE_SUCCEED = 20;
+    public static final byte RESPONSE_FAIL = 21;
 }

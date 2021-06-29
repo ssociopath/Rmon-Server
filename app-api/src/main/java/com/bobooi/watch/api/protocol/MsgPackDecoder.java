@@ -1,5 +1,6 @@
 package com.bobooi.watch.api.protocol;
 
+import com.bobooi.watch.api.protocol.vo.RequestPacket;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
@@ -20,6 +21,6 @@ public class MsgPackDecoder extends MessageToMessageDecoder<ByteBuf> {
         array=new byte[length];
         msg.getBytes(msg.readerIndex(), array,0,length);
         MessagePack msgpack=new MessagePack();
-        out.add(msgpack.read(array, MsgPack.class));
+        out.add(msgpack.read(array, RequestPacket.class));
     }
 }

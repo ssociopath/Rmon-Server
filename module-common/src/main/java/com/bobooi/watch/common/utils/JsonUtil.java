@@ -6,11 +6,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.LocalDateTime;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author bobo
@@ -60,5 +64,22 @@ public class JsonUtil {
     }
     public static <T> T parseObject(String json, Class<T> clazz) {
         return parseObject(parse(json), clazz);
+    }
+
+    public static <T> List<T> parseList(String json, Class<T> clazz) {
+        try {
+            return OBJECT_MAPPER.readValue(json, TypeFactory.defaultInstance().constructCollectionType(ArrayList.class, clazz));
+        } catch (JsonProcessingException e) {
+            log.error("Json解析错误 {}", json, e);
+        }
+        return new ArrayList<>();
+    }
+
+    public static <T> Stream<T> asStream(String jsonString, Class<T> clazz) {
+        return StreamSupport.stream(parse(jsonString).spliterator(), false).map(json -> parseObject(json, clazz));
+    }
+
+    public static <T> List<T> asList(String json, Class<T> clazz) {
+        return asStream(json, clazz).collect(Collectors.toList());
     }
 }

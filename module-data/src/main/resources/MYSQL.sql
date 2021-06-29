@@ -4,9 +4,16 @@ create table user (
     password varchar(80) not null
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+create table pc (
+    id int primary key auto_increment,
+    mac varchar(17) not null unique,
+    password varchar(80) not null
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
 create table rule (
     id int primary key auto_increment,
     userId int,
-    mac varchar(17) not null unique,
+    pcId int,
     permission int not null
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
