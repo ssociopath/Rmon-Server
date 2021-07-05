@@ -3,11 +3,12 @@ package com.bobooi.watch.api.controller;
 import com.bobooi.watch.api.protocol.vo.WsMessage;
 import com.bobooi.watch.common.utils.JsonUtil;
 import com.bobooi.watch.common.utils.misc.Constant;
-import com.bobooi.watch.data.entity.Pc;
+import com.bobooi.watch.data.entity.Rule;
+import com.bobooi.watch.data.entity.User;
 import com.bobooi.watch.data.service.concrete.PcService;
 import com.bobooi.watch.data.service.concrete.RuleService;
+import com.bobooi.watch.data.service.concrete.UserService;
 import lombok.extern.slf4j.Slf4j;
-import org.antlr.v4.runtime.dfa.DFA;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -27,16 +28,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
-@ServerEndpoint("/{userId}")
+@ServerEndpoint("/ws/{account}")
 public class WebSocketChatServer {
     private static Map<String, Session> ONLINE_SESSIONS = new ConcurrentHashMap<>();
-    private static Map<String, WsMessage> CONNECT_SESSIONS = new ConcurrentHashMap<>();
+    private static Map<String, Rule> CONNECT_SESSIONS = new ConcurrentHashMap<>();
     @Resource
     SocketServer socketServer;
     @Resource
     private RuleService ruleService;
     @Resource
-    private PcService pcService;
+     private PcService pcService;
+    @Resource
+    private UserService userService;
     private static WebSocketChatServer webSocketChatServer;
 
     @PostConstruct
@@ -44,6 +47,7 @@ public class WebSocketChatServer {
         webSocketChatServer = this;
         webSocketChatServer.pcService = this.pcService;
         webSocketChatServer.ruleService = this.ruleService;
+        webSocketChatServer.userService = this.userService;
         webSocketChatServer.socketServer = this.socketServer;
     }
 
@@ -53,33 +57,48 @@ public class WebSocketChatServer {
      */
     @OnOpen
     public void onOpen(Session session,@PathParam("userId") String userId) {
-        ONLINE_SESSIONS.put(userId, session);
         System.out.println("成功连接，在线人数："+ ONLINE_SESSIONS.size());
     }
 
 
     @OnMessage
-    public void onMessage(String jsonStr) throws IOException {
-        System.out.println(jsonStr);
+    public void onMessage(Session session, String jsonStr) throws IOException {
         WsMessage wsMessage = JsonUtil.parseObject(jsonStr, WsMessage.class);
-        if(Constant.WS_OPEN.equals(wsMessage.getType())){
+        String type = wsMessage.getType();
+        String content = wsMessage.getContent();
 
-        }else{
-            Pc pc = webSocketChatServer.pcService.findOneByMac(wsMessage.getToUserId());
-            if(pc!=null && webSocketChatServer.ruleService.findOneByUserIdAndPcId(Integer.valueOf(wsMessage.getFromUserId()),pc.getId())!=null){
-                wsMessage.setToUserId(String.valueOf(pc.getId()));
-                String content = JsonUtil.toJsonString(wsMessage);
-                CONNECT_SESSIONS.put(wsMessage.getFromUserId(),wsMessage);
-                webSocketChatServer.socketServer.sendMsg(pc.getId(),Constant.IMAGE,Constant.RESPONSE_SUCCEED,
-                        -1, Constant.DF,content.getBytes(StandardCharsets.UTF_8));
+        switch (type){
+            case Constant.WS_LOGIN:{
+                User user = JsonUtil.parseObject(content, User.class);
+                WsMessage response;
+                if((user = webSocketChatServer.userService.getUserByAccountAndPwd(user))!=null){
+                    ONLINE_SESSIONS.put(user.getAccount(), session);
+                    response = new WsMessage(Constant.WS_LOGIN,"登录成功");
+                }else{
+                    response = new WsMessage(Constant.WS_LOGIN,"登录失败");
+                }
+                session.getBasicRemote().sendText(JsonUtil.toJsonString(response));
+                break;
             }
+            case Constant.WS_IMAGE:{
+                System.out.println(content);
+                Rule rule  = JsonUtil.parseObject(content,Rule.class);
+                System.out.println(rule);
+                if(webSocketChatServer.ruleService.getRuleByAccountAndMac(rule)!=null){
+                    CONNECT_SESSIONS.put(rule.getAccount(),rule);
+                    webSocketChatServer.socketServer.sendMsg(rule.getMac(),Constant.IMAGE,Constant.RESPONSE_SUCCEED,
+                            -1, Constant.DF,JsonUtil.toJsonString(rule).getBytes(StandardCharsets.UTF_8));
+                }
+                break;
+            }
+            default:break;
         }
         log.info("收到消息："+ wsMessage);
     }
 
-    public static void sendMsg(WsMessage wsMessage) throws IOException {
-        if(ONLINE_SESSIONS.containsKey(wsMessage.getFromUserId())){
-            ONLINE_SESSIONS.get(wsMessage.getFromUserId()).getBasicRemote().sendText(JsonUtil.toJsonString(wsMessage));
+    public static void sendMsg(String account,WsMessage wsMessage) throws IOException {
+        if(ONLINE_SESSIONS.containsKey(account)){
+            ONLINE_SESSIONS.get(account).getBasicRemote().sendText(JsonUtil.toJsonString(wsMessage));
         }
     }
 
@@ -87,12 +106,14 @@ public class WebSocketChatServer {
      * 当关闭连接：1.移除会话对象 2.更新在线人数
      */
     @OnClose
-    public void onClose(@PathParam("userId") String userId) {
-        WsMessage wsMessage = CONNECT_SESSIONS.get(userId);
-        ONLINE_SESSIONS.remove(userId);
-        CONNECT_SESSIONS.remove(userId);
-        webSocketChatServer.socketServer.sendMsg(Integer.valueOf(wsMessage.getToUserId()),Constant.LOGOUT,
-                Constant.RESPONSE_SUCCEED, -2, Constant.DF,"关闭监控".getBytes());
+    public void onClose(@PathParam("account") String account) {
+        ONLINE_SESSIONS.remove(account);
+        if(CONNECT_SESSIONS.containsKey(account)){
+            System.out.println(account);
+            Rule rule = CONNECT_SESSIONS.get(account);
+            webSocketChatServer.socketServer.sendMsg(rule.getMac(),Constant.LOGOUT,
+                    Constant.RESPONSE_SUCCEED, -2, Constant.DF,"关闭监控".getBytes());
+        }
         System.out.println("关闭连接，在线人数："+ ONLINE_SESSIONS.size());
     }
 

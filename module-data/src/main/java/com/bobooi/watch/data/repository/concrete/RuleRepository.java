@@ -12,7 +12,6 @@ import java.util.List;
  */
 
 public interface RuleRepository extends DataRepository<Rule, Integer> {
-    List<Rule> findAllByPcId(Integer pcId);
-    Rule findByAccount(String account);
-    Rule findByUserIdAndPcId(Integer userId, Integer pcId);
+    List<Rule> findAllByMac(String mac);
+    Rule findAllByAccountAndMac(String account, String mac);
 }

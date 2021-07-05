@@ -19,36 +19,15 @@ public class RuleVO {
     private String account;
     private String permission;
 
-    public static RuleVO fromRule(Rule rule){
-        String per = "未定义权限";
-        switch (rule.getPermission()){
-            case '1':
-                per = "允许操作";
-                break;
-            case '2':
-                per = "允许监控";
-                break;
-            default: break;
-        }
-
-        return builder().ruleId(rule.getId())
-                .account(rule.getAccount())
-                .permission(per)
-                .build();
+    public Rule toRule(String mac){
+        return new Rule(ruleId,account,mac, "允许操作".equals(permission) ?'1':'2');
     }
 
-    public Character getBytePermission(){
-        char per = '0';
-        switch (permission){
-            case "允许操作":
-                per = '1';
-                break;
-            case "允许监控":
-                per = '2';
-                break;
-            default: break;
-        }
-        return per;
+    public static RuleVO fromRule(Rule rule){
+        return builder().ruleId(rule.getId())
+                .account(rule.getAccount())
+                .permission(rule.getPermission()=='1'?"允许操作":"允许监控")
+                .build();
     }
 
 }

@@ -10,7 +10,8 @@ public class Constant {
     public static final int ACCOUNT_MAX_LEN =20;
     public static final int PASSWORD_MAX_LEN = 8;
 
-    public static final String WS_OPEN = "open";
+    public static final String WS_LOGIN = "LOGIN";
+    public static final String WS_IMAGE = "IMAGE";
 
     /**
      * 消息类型，即请求内容类型

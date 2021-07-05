@@ -22,10 +22,8 @@ import java.util.List;
 public class RuleService extends BaseDataService<Rule,Integer> {
     @Resource
     RuleRepository ruleRepository;
-    @Resource
-    UserRepository userRepository;
 
-    public boolean deleteById(Integer id){
+    public boolean deleteRuleById(Integer id){
         Rule rule = this.getOneOr(id, null);
         if(null!=rule){
             this.delete(rule);
@@ -34,37 +32,19 @@ public class RuleService extends BaseDataService<Rule,Integer> {
         return false;
     }
 
-    public boolean update(Integer id, Integer pcId, String account, Character permission) {
-        Rule rule;
-        User user = userRepository.findUserByAccount(account);
-        if(user!=null && ruleRepository.findByAccount(account)==null){
-            if(id==null){
-                rule = new Rule();
-            }else{
-                rule = this.getOneOr(id, null);
-                if(null==rule){
-                    return false;
-                }
-            }
-            rule.setPcId(pcId);
-            rule.setUserId(user.getId());
-            rule.setAccount(account);
-            rule.setPermission(permission);
-            System.out.println(rule);
-            this.save(rule);
-            return true;
+    public boolean updateRule(Rule rule) {
+        if(findOne(rule).isPresent()){
+            return false;
         }
-
-
-
-        return false;
+        save(rule);
+        return true;
     }
 
-    public List<Rule> findAllByPcId(Integer pcId){
-        return ruleRepository.findAllByPcId(pcId);
+    public List<Rule> getAllByMac(String mac){
+        return ruleRepository.findAllByMac(mac);
     }
 
-    public Rule findOneByUserIdAndPcId(Integer userId,Integer pcId){
-        return ruleRepository.findByUserIdAndPcId(userId,pcId);
+    public Rule getRuleByAccountAndMac(Rule rule){
+        return ruleRepository.findAllByAccountAndMac(rule.getAccount(),rule.getMac());
     }
 }

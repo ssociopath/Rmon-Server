@@ -2,16 +2,13 @@ package com.bobooi.watch.api.handler;
 
 import com.bobooi.watch.api.controller.SocketServer;
 import com.bobooi.watch.api.controller.WebSocketChatServer;
-import com.bobooi.watch.api.protocol.vo.RequestPacket;
-import com.bobooi.watch.api.protocol.vo.ResponsePacket;
-import com.bobooi.watch.api.protocol.vo.RuleVO;
-import com.bobooi.watch.api.protocol.vo.WsMessage;
+import com.bobooi.watch.api.protocol.vo.*;
 import com.bobooi.watch.common.utils.JsonUtil;
 import com.bobooi.watch.common.utils.misc.Constant;
 import com.bobooi.watch.data.entity.Pc;
+import com.bobooi.watch.data.entity.Rule;
 import com.bobooi.watch.data.service.concrete.PcService;
 import com.bobooi.watch.data.service.concrete.RuleService;
-import com.mysql.cj.protocol.Message;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.timeout.IdleState;
@@ -40,10 +37,9 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
     public RuleService ruleService;
     private static ServerHandler  serverHandler;
     private int unRecPingTimes = 0;
-    private String clientAddr="";
-    private Integer pcId;
     private static final int MAX_UN_REC_PING_TIMES = 3;
     private static Map<Integer,byte[]> pkgList = new HashMap<>();
+    private String mac;
 
     @PostConstruct
     public void init() {
@@ -57,9 +53,9 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent event = (IdleStateEvent) evt;
             if (event.state()== IdleState.READER_IDLE){
-                System.out.println("===服务端===(READER_IDLE 读超时)");
+                System.out.println("未收到"+mac+"消息，服务端读超时");
                 if (unRecPingTimes >= MAX_UN_REC_PING_TIMES) {
-                    System.out.println("===服务端===(读超时，关闭chanel)");
+                    System.out.println("服务端读超时，关闭"+mac);
                     ctx.close();
                 } else {
                     unRecPingTimes++;
@@ -102,8 +98,8 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
         responsePack.setType(type);
         responsePack.setId(id+1);
         String contentStr = new String(content,StandardCharsets.UTF_8);
-        String response = "收到客户端 "+clientAddr + " 消息：" +
-                (type==Constant.IMAGE?("图片:seq="+id):contentStr);
+        String response = "收到客户端 "+ (mac==null?ctx.channel().remoteAddress():mac)
+                + " 消息：" + (type==Constant.IMAGE?("图片:seq="+id):contentStr);
 
         switch (type){
             case Constant.HEART:
@@ -114,29 +110,25 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                 break;
             case Constant.LOGIN:
                 Pc pc = JsonUtil.parseObject(contentStr, Pc.class);
-                Pc thePc = serverHandler.pcService.login(pc);
-                if(thePc==null){
+                if((pc = serverHandler.pcService.login(pc))==null){
                     responsePack.setContent("用户或密码错误".getBytes());
                     responsePack.setResult(Constant.RESPONSE_FAIL);
                 }else{
-                    pcId = thePc.getId();
-                    responsePack.setContent(JsonUtil.toJsonString(
-                            serverHandler.ruleService.findAllByPcId(pcId)
+                    mac = pc.getMac();
+                    responsePack.setContent(JsonUtil.toJsonString(serverHandler.ruleService.getAllByMac(mac)
                                     .stream()
                                     .map(RuleVO::fromRule)
                                     .collect(Collectors.toList()))
                                     .getBytes(StandardCharsets.UTF_8));
-                    SocketServer.LOGIN_CHANNELS.put(pcId,ctx.channel());
+                    SocketServer.ONLINE_CHANNELS.put(mac,ctx.channel());
                     responsePack.setResult(Constant.RESPONSE_SUCCEED);
                 }
                 ctx.writeAndFlush(responsePack);
                 break;
             case Constant.DATA_UPDATE:
                 RuleVO ruleVO = JsonUtil.parseObject(new String(content, StandardCharsets.UTF_8),RuleVO.class);
-                if(serverHandler.ruleService.update(ruleVO.getRuleId()==null?null:ruleVO.getRuleId(), pcId,
-                        ruleVO.getAccount(), ruleVO.getBytePermission())){
-                    responsePack.setContent(JsonUtil.toJsonString(
-                            serverHandler.ruleService.findAll()
+                if(serverHandler.ruleService.updateRule(ruleVO.toRule(mac))){
+                    responsePack.setContent(JsonUtil.toJsonString(serverHandler.ruleService.getAllByMac(mac)
                                     .stream()
                                     .map(RuleVO::fromRule)
                                     .collect(Collectors.toList())).getBytes());
@@ -149,9 +141,8 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                 break;
             case Constant.DATA_DELETE:
                 Integer ruleId = Integer.valueOf(contentStr);
-                if(serverHandler.ruleService.deleteById(ruleId)){
-                    responsePack.setContent(JsonUtil.toJsonString(
-                            serverHandler.ruleService.findAll()
+                if(serverHandler.ruleService.deleteRuleById(ruleId)){
+                    responsePack.setContent(JsonUtil.toJsonString(serverHandler.ruleService.getAllByMac(mac)
                                     .stream()
                                     .map(RuleVO::fromRule)
                                     .collect(Collectors.toList())).getBytes());
@@ -168,8 +159,12 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                 break;
             case Constant.IMAGE:
                 responsePack.setContent(("图片消息:seq="+ id).getBytes());
-                WsMessage wsMessage = JsonUtil.parseObject(contentStr, WsMessage.class);
-                WebSocketChatServer.sendMsg(wsMessage);
+                Image image = JsonUtil.parseObject(contentStr, Image.class);
+                WsMessage wsMessage = WsMessage.builder()
+                        .type(Constant.WS_IMAGE)
+                        .content(Base64.getEncoder().encodeToString(image.getContent()))
+                        .build();
+                WebSocketChatServer.sendMsg(image.getAccount(),wsMessage);
                 break;
             default:
                 responsePack.setContent(("不支持的请求方式:seq="+ id).getBytes());
@@ -182,17 +177,14 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         super.channelActive(ctx);
-        clientAddr = String.valueOf(ctx.channel().remoteAddress());
-        SocketServer.ONLINE_CHANNELS.put(clientAddr,ctx.channel());
-        System.out.println("客户端 "+clientAddr+" 已连接");
+        System.out.println("客户端 "+ctx.channel().remoteAddress()+" 已连接");
 
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
-        SocketServer.ONLINE_CHANNELS.remove(clientAddr);
-        SocketServer.LOGIN_CHANNELS.remove(pcId);
-        System.out.println("客户端 "+clientAddr+" 已断开");
+        SocketServer.ONLINE_CHANNELS.remove(mac);
+        System.out.println("客户端 "+ctx.channel().remoteAddress()+" 已断开");
     }
 }

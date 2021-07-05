@@ -7,7 +7,6 @@ import com.bobooi.watch.api.protocol.MsgPackEncoder;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -29,10 +28,9 @@ import java.util.concurrent.TimeUnit;
 public class SocketServer implements CommandLineRunner {
 
     public static final Map<String, Channel> ONLINE_CHANNELS = new ConcurrentHashMap<>();
-    public static final Map<Integer, Channel> LOGIN_CHANNELS  = new ConcurrentHashMap<>();
 
-    public boolean sendMsg(Integer pcId,byte type,byte result, int id,byte flag,byte[] content){
-        Channel socketChannel = LOGIN_CHANNELS.get(pcId);
+    public boolean sendMsg(String mac,byte type,byte result, int id,byte flag,byte[] content){
+        Channel socketChannel = ONLINE_CHANNELS.get(mac);
         if(socketChannel != null){
             if(socketChannel.isOpen() || socketChannel.isActive()){
                 socketChannel.writeAndFlush(new ResponsePacket(type,result,id,flag,content));
