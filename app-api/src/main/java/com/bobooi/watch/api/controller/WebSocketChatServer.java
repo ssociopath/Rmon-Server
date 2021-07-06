@@ -76,7 +76,7 @@ public class WebSocketChatServer {
                     CONNECT_SESSIONS.put(from, rule);
                     if (webSocketChatServer.socketServer.sendMsg(to, Constant.IMAGE, Constant.RESPONSE_SUCCEED,
                             -1, Constant.DF, jsonStr.getBytes(StandardCharsets.UTF_8))) {
-                        wsMessage.setContent(rule.getPermission() == '1' ? "允许操作" : "允许访问");
+                        wsMessage.setContent(JsonUtil.toJsonString(rule));
                     }
                 }
                 sendMsg(from,wsMessage);
