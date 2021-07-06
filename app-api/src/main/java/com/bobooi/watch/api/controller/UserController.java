@@ -14,7 +14,7 @@ import javax.annotation.Resource;
  * @date 2021/6/22
  */
 
-@CrossOrigin(allowCredentials = "true")
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/user")
 public class UserController {

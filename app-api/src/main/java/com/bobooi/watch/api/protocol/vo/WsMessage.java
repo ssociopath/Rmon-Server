@@ -16,5 +16,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class WsMessage {
     private String type;
+    private String from;
+    private String to;
     private String content;
 }

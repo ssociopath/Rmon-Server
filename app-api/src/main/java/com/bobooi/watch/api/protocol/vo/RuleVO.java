@@ -26,7 +26,7 @@ public class RuleVO {
     public static RuleVO fromRule(Rule rule){
         return builder().ruleId(rule.getId())
                 .account(rule.getAccount())
-                .permission(rule.getPermission()=='1'?"允许操作":"允许监控")
+                .permission(rule.getPermission()=='1'?"允许操作":"允许访问")
                 .build();
     }
 

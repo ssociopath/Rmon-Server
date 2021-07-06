@@ -37,9 +37,7 @@ public class WebSocketChatServer {
     @Resource
     private RuleService ruleService;
     @Resource
-     private PcService pcService;
-    @Resource
-    private UserService userService;
+    private PcService pcService;
     private static WebSocketChatServer webSocketChatServer;
 
     @PostConstruct
@@ -47,7 +45,6 @@ public class WebSocketChatServer {
         webSocketChatServer = this;
         webSocketChatServer.pcService = this.pcService;
         webSocketChatServer.ruleService = this.ruleService;
-        webSocketChatServer.userService = this.userService;
         webSocketChatServer.socketServer = this.socketServer;
     }
 
@@ -56,7 +53,9 @@ public class WebSocketChatServer {
      * 当客户端打开连接：1.添加会话对象 2.更新在线人数
      */
     @OnOpen
-    public void onOpen(Session session,@PathParam("userId") String userId) {
+    public void onOpen(Session session,@PathParam("account") String userId) {
+        System.out.println(userId);
+        ONLINE_SESSIONS.put(userId, session);
         System.out.println("成功连接，在线人数："+ ONLINE_SESSIONS.size());
     }
 
@@ -65,32 +64,31 @@ public class WebSocketChatServer {
     public void onMessage(Session session, String jsonStr) throws IOException {
         WsMessage wsMessage = JsonUtil.parseObject(jsonStr, WsMessage.class);
         String type = wsMessage.getType();
+        String from = wsMessage.getFrom();
+        String to = wsMessage.getTo();
         String content = wsMessage.getContent();
 
         switch (type){
-            case Constant.WS_LOGIN:{
-                User user = JsonUtil.parseObject(content, User.class);
-                WsMessage response;
-                if((user = webSocketChatServer.userService.getUserByAccountAndPwd(user))!=null){
-                    ONLINE_SESSIONS.put(user.getAccount(), session);
-                    response = new WsMessage(Constant.WS_LOGIN,"登录成功");
-                }else{
-                    response = new WsMessage(Constant.WS_LOGIN,"登录失败");
-                }
-                session.getBasicRemote().sendText(JsonUtil.toJsonString(response));
-                break;
-            }
-            case Constant.WS_IMAGE:{
-                System.out.println(content);
+            case Constant.WS_CONNECT:
                 Rule rule  = JsonUtil.parseObject(content,Rule.class);
-                System.out.println(rule);
-                if(webSocketChatServer.ruleService.getRuleByAccountAndMac(rule)!=null){
-                    CONNECT_SESSIONS.put(rule.getAccount(),rule);
-                    webSocketChatServer.socketServer.sendMsg(rule.getMac(),Constant.IMAGE,Constant.RESPONSE_SUCCEED,
-                            -1, Constant.DF,JsonUtil.toJsonString(rule).getBytes(StandardCharsets.UTF_8));
+                wsMessage.setContent("连接失败，请检查网络和被控端");
+                if((rule=webSocketChatServer.ruleService.getRuleByAccountAndMac(rule))!=null) {
+                    CONNECT_SESSIONS.put(from, rule);
+                    if (webSocketChatServer.socketServer.sendMsg(to, Constant.IMAGE, Constant.RESPONSE_SUCCEED,
+                            -1, Constant.DF, jsonStr.getBytes(StandardCharsets.UTF_8))) {
+                        wsMessage.setContent(rule.getPermission() == '1' ? "允许操作" : "允许访问");
+                    }
                 }
+                sendMsg(from,wsMessage);
                 break;
-            }
+            case Constant.WS_RES:
+                webSocketChatServer.socketServer.sendMsg(to,Constant.RES_UPDATE,Constant.RESPONSE_SUCCEED,
+                        -1, Constant.DF,jsonStr.getBytes(StandardCharsets.UTF_8));
+                break;
+            case Constant.WS_CMD:
+                webSocketChatServer.socketServer.sendMsg(to,Constant.CMD,Constant.RESPONSE_SUCCEED,
+                        -1, Constant.DF,jsonStr.getBytes(StandardCharsets.UTF_8));
+                break;
             default:break;
         }
         log.info("收到消息："+ wsMessage);

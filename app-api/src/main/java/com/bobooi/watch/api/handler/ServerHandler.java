@@ -6,7 +6,6 @@ import com.bobooi.watch.api.protocol.vo.*;
 import com.bobooi.watch.common.utils.JsonUtil;
 import com.bobooi.watch.common.utils.misc.Constant;
 import com.bobooi.watch.data.entity.Pc;
-import com.bobooi.watch.data.entity.Rule;
 import com.bobooi.watch.data.service.concrete.PcService;
 import com.bobooi.watch.data.service.concrete.RuleService;
 import io.netty.channel.ChannelHandlerContext;
@@ -98,15 +97,15 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
         responsePack.setType(type);
         responsePack.setId(id+1);
         String contentStr = new String(content,StandardCharsets.UTF_8);
-        String response = "收到客户端 "+ (mac==null?ctx.channel().remoteAddress():mac)
-                + " 消息：" + (type==Constant.IMAGE?("图片:seq="+id):contentStr);
+        String response = "收到客户端 "+ (mac==null?ctx.channel().remoteAddress():mac) + " 消息：";
+
+        WsMessage wsMessage = null;
 
         switch (type){
             case Constant.HEART:
                 responsePack = new ResponsePacket();
                 responsePack.setContent(("心跳连接:seq="+ id).getBytes());
                 responsePack.setResult(Constant.RESPONSE_SUCCEED);
-                ctx.writeAndFlush(responsePack);
                 break;
             case Constant.LOGIN:
                 Pc pc = JsonUtil.parseObject(contentStr, Pc.class);
@@ -153,24 +152,27 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                 }
                 ctx.writeAndFlush(responsePack);
                 break;
-            case Constant.LOGOUT:
-                // TODO 处理登出逻辑
-                responsePack.setContent(("登出信息:seq="+ id).getBytes());
-                break;
             case Constant.IMAGE:
                 responsePack.setContent(("图片消息:seq="+ id).getBytes());
-                Image image = JsonUtil.parseObject(contentStr, Image.class);
-                WsMessage wsMessage = WsMessage.builder()
-                        .type(Constant.WS_IMAGE)
-                        .content(Base64.getEncoder().encodeToString(image.getContent()))
-                        .build();
-                WebSocketChatServer.sendMsg(image.getAccount(),wsMessage);
+                wsMessage = JsonUtil.parseObject(contentStr, WsMessage.class);
+                wsMessage.setType(Constant.WS_IMAGE);
+                wsMessage.setContent(Base64.getEncoder().encodeToString(wsMessage.getContent().getBytes(StandardCharsets.ISO_8859_1)));
+                WebSocketChatServer.sendMsg(wsMessage.getFrom(),wsMessage);
+                break;
+            case Constant.TASK:
+                responsePack.setContent(("进程消息:seq="+ id).getBytes());
+                wsMessage = JsonUtil.parseObject(contentStr, WsMessage.class);
+                wsMessage.setType(Constant.WS_TASK);
+                WebSocketChatServer.sendMsg(wsMessage.getFrom(),wsMessage);
                 break;
             default:
                 responsePack.setContent(("不支持的请求方式:seq="+ id).getBytes());
                 break;
         }
-        System.out.println(response);
+        if(type!=Constant.IMAGE&&type!=Constant.TASK){
+            response += contentStr;
+            System.out.println(response);
+        }
     }
 
 
