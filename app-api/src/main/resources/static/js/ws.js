@@ -16,12 +16,12 @@ function connectWebsocket(account) {
             if(message.content==='连接失败，请检查网络和被控端'){
                 alert(message.content);
             }else{
-                let rule = JSON.parse(msg.content);
+                let rule = JSON.parse(message.content);
                 $.cookie('mac',rule.mac);
                 $.cookie('account',rule.account);
                 $("#status").html(`被控端：${rule.mac}`);
                 $("#current-user").html(`当前用户：${rule.account}`);
-                if(message.permission==='1'){
+                if(rule.permission==='1'){
                     $("#permission").html(`当前权限：<span>允许访问</span>`);
                     $("input[name='instructions']").attr("disabled", "disabled");
                     $("#btn-cmd").attr("disabled", "disabled");

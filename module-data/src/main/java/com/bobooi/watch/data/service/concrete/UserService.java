@@ -33,6 +33,7 @@ public class UserService extends BaseDataService<User, Integer> {
     }
 
     public User getUserByAccountAndPwd(User user) {
+        user.setPassword(DigestUtils.sha1Hex(user.getPassword()));
         User theUser = findOne(user).orElse(null);
         AssertUtils.isTrue(theUser!=null, ApplicationException.withResponse(SystemCodeEnum.NEED_LOGIN, "用户名或密码错误"));
         return findOne(user).orElse(null);

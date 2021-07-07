@@ -57,7 +57,7 @@ body {
     background-color: #59B2E0;
     outline: none;
     color: #fff;
-    font-size: 14px;
+    font-size: 16px;
     height: auto;
     font-weight: normal;
     padding: 14px 0;
@@ -70,21 +70,15 @@ body {
     background-color: #53A3CD;
     border-color: #53A3CD;
 }
-.forgot-password {
-    text-decoration: underline;
-    color: #888;
-}
-.forgot-password:hover,
-.forgot-password:focus {
-    text-decoration: underline;
-    color: #666;
+div .person-intro {
+    color: #757575;
 }
 
 .btn-register {
     background-color: #1CB94E;
     outline: none;
     color: #fff;
-    font-size: 14px;
+    font-size: 16px;
     height: auto;
     font-weight: normal;
     padding: 14px 0;

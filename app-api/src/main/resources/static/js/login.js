@@ -35,4 +35,32 @@ $(function () {
             }
         );
     });
+
+    $("#register-submit").click(function () {
+        let account = $("#username").val();
+        let password = $("#password").val();
+        let confirm_password = $("#confirm-password").val();
+        if(password === confirm_password && password!==''){
+            $.post(
+                "http://bobooi.com:8081/watch/user/register",
+                {
+                    account,
+                    password
+                },
+                function (data, status) {
+                    console.log(data);
+                    if (data.code === "00000") {
+                        console.log(data.data);
+                        alert("注册成功，请登录");
+                        // $.cookie("account", account);
+                        // $(location).attr("href", "index");
+                    } else {
+                        alert(data.message);
+                    }
+                }
+            );
+        }else{
+            alert("填写正确信息！")
+        }
+    });
 });

@@ -20,13 +20,13 @@ public class RuleVO {
     private String permission;
 
     public Rule toRule(String mac){
-        return new Rule(ruleId,account,mac, "允许操作".equals(permission) ?'1':'2');
+        return new Rule(ruleId,account,mac, "允许操作".equals(permission) ?'2':'1');
     }
 
     public static RuleVO fromRule(Rule rule){
         return builder().ruleId(rule.getId())
                 .account(rule.getAccount())
-                .permission(rule.getPermission()=='1'?"允许操作":"允许访问")
+                .permission(rule.getPermission()=='2'?"允许操作":"允许访问")
                 .build();
     }
 

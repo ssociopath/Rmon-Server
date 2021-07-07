@@ -14,9 +14,9 @@ $(function () {
     });
 
     $("#btn-send").click(function (e) {
-        mac = $("#mac").val();
-        let msg = { type: "CONNECT", from:$.cookie("account"), to:$.cookie("mac"),
-            content: JSON.stringify({ account:$.cookie("account"), mac:$.cookie("mac") }) };
+        let mac = $("#mac").val();
+        let msg = { type: "CONNECT", from:$.cookie("account"), to:mac,
+            content: JSON.stringify({ account:$.cookie("account"), mac}) };
         console.log(JSON.stringify(msg));
         ws.send(JSON.stringify(msg));
         e.preventDefault();
