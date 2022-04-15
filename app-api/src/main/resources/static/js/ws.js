@@ -2,7 +2,7 @@ var ws;
 var task;
 
 function connectWebsocket(account) {
-    ws = new WebSocket("ws://bobooi.com:8081/watch/ws/" + account);
+    ws = new WebSocket("ws://bobooi.com:8091/watch/ws/" + account);
 
     // 连接成功
     ws.onopen = () => {

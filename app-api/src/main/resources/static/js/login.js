@@ -18,7 +18,7 @@ $(function () {
         let account = $("#login-username").val();
         let password = $("#login-password").val();
         $.post(
-            "http://bobooi.com:8081/watch/user/login",
+            "http://bobooi.com:8091/watch/user/login",
             {
                 account,
                 password
@@ -42,7 +42,7 @@ $(function () {
         let confirm_password = $("#confirm-password").val();
         if(password === confirm_password && password!==''){
             $.post(
-                "http://bobooi.com:8081/watch/user/register",
+                "http://bobooi.com:8091/watch/user/register",
                 {
                     account,
                     password
