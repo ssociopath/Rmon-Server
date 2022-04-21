@@ -26,7 +26,6 @@ $(function () {
             function (data, status) {
                 console.log(data);
                 if (data.code === "00000") {
-                    console.log(data.data);
                     $.cookie("account", account);
                     $(location).attr("href", "index");
                 } else {

@@ -1,3 +1,5 @@
+type = 'watch';
+
 $(function () {
     if($.cookie("account")==='null'){
         $(location).attr("href", "login");
@@ -29,6 +31,12 @@ $(function () {
         e.preventDefault();
     });
 
+    $("#btn-control").click(function (e) {
+        $("#watch_wrap").hide();
+        $.getScript("js/listen.js");
+        e.preventDefault();
+    });
+
     $("#btn-img").click(function (e) {
         downloadFileByBase64($('#watch-img')[0].src);
         e.preventDefault();
@@ -41,7 +49,7 @@ $(function () {
 });
 
 
-$(window).unload(function () {
-    $.cookie("account",null);
-    $.cookie("mac", null);
-});
+// $(window).unload(function () {
+//     $.cookie("account",null);
+//     $.cookie("mac", null);
+// });

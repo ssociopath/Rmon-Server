@@ -1,5 +1,6 @@
 var ws;
 var task;
+var type;
 
 function connectWebsocket(account) {
     ws = new WebSocket("ws://bobooi.com:8091/watch/ws/" + account);
@@ -32,7 +33,7 @@ function connectWebsocket(account) {
                 $("#input_wrap").hide();
             }
         }else if (message.type === "IMAGE") {
-            $("#watch").html('<img id="watch-img" src="data:image/jpg;base64,' + message.content + '">');
+            $("#"+type).html('<img id="control-img" src="data:image/jpg;base64,' + message.content + '">');
         } else if (message.type === "TASK") {
             task = JSON.parse(message.content);
             createShowingTable(task);
