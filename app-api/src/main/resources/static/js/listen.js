@@ -1,11 +1,13 @@
 type = 'control';
 
-
-//计算control-img的宽和高变量
 var imageWidth = $("#control").innerWidth();
 var imageHeight = $("#control").innerHeight();
 
-//当浏览器大小变化时，更新control-img的宽和高变量
+setTimeout(function (){
+    imageWidth = $("#control").innerWidth();
+    imageHeight = $("#control").innerHeight();
+}, 500);
+
 $(window).resize( function  () {
     imageWidth = $("#control").innerWidth();
     imageHeight = $("#control").innerHeight();
@@ -21,34 +23,9 @@ $(document).keydown(function (event) {
     let obj = {};
     obj.openType = "keydown";
     obj.keyCode = event.keyCode;
-    let msg = { type: "CONTROL", from:$.cookie("account"), to:$.cookie("mac"),content: JSON.stringify(obj)};
+    let msg = { type: "CMD", from:$.cookie("account"), to:$.cookie("mac"),content: JSON.stringify(obj)};
     ws.send(JSON.stringify(msg));
-
-    //禁用一些快捷键
-    if (event.ctrlKey && window.keyCode===65){ //禁用ctrl + a 功能
-        return false;
-    }
-
-    //禁用一些快捷键
-    if (event.ctrlKey && window.keyCode===67){	//禁用ctrl + c 功能
-        return false;
-    }
-
-    //禁用一些快捷键
-    if (event.ctrlKey && window.keyCode===83){	//禁用ctrl + s 功能
-        return false;
-    }
-
-    //禁用一些快捷键
-    if (event.ctrlKey && window.keyCode===86){	//禁用ctrl + v 功能
-        return false;
-    }
-
-    //你想禁用其他快捷键时
-    //console.log(event);
-    //比如说我按下 A键 keyCode=65 获取到keyCode，然后按以上的方法禁止
-    //目前F1到F12还没有禁用，如果需要的话可以加上。
-
+    event.preventDefault();
 });
 
 //键盘被弹起来事件
