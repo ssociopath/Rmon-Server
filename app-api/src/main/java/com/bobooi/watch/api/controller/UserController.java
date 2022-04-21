@@ -2,7 +2,6 @@ package com.bobooi.watch.api.controller;
 import com.bobooi.watch.common.response.ApplicationResponse;
 import com.bobooi.watch.data.entity.User;
 import com.bobooi.watch.data.service.concrete.UserService;
-import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 

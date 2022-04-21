@@ -4,10 +4,8 @@ import com.bobooi.watch.api.protocol.vo.WsMessage;
 import com.bobooi.watch.common.utils.JsonUtil;
 import com.bobooi.watch.common.utils.misc.Constant;
 import com.bobooi.watch.data.entity.Rule;
-import com.bobooi.watch.data.entity.User;
 import com.bobooi.watch.data.service.concrete.PcService;
 import com.bobooi.watch.data.service.concrete.RuleService;
-import com.bobooi.watch.data.service.concrete.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

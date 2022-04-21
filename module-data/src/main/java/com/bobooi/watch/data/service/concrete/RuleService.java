@@ -1,15 +1,12 @@
 package com.bobooi.watch.data.service.concrete;
 
 import com.bobooi.watch.data.entity.Rule;
-import com.bobooi.watch.data.entity.User;
 import com.bobooi.watch.data.repository.concrete.RuleRepository;
-import com.bobooi.watch.data.repository.concrete.UserRepository;
 import com.bobooi.watch.data.service.BaseDataService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.sql.SQLException;
 import java.util.List;
 
 /**
